@@ -57,7 +57,7 @@ func NewRegistryPullThroughCache(ctx context.Context, registry distribution.Name
 			return err
 		}
 
-		err = v.RemoveBlob(r.Digest().String())
+		err = v.RemoveBlob(r.Digest().String(), false)
 		if err != nil {
 			return err
 		}

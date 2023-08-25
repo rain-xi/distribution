@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"path"
+	"time"
 
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/storage/driver"
@@ -29,7 +30,7 @@ type Vacuum struct {
 }
 
 // RemoveBlob removes a blob from the filesystem
-func (v Vacuum) RemoveBlob(dgst string) error {
+func (v Vacuum) RemoveBlob(dgst string, gc bool) error {
 	d, err := digest.Parse(dgst)
 	if err != nil {
 		return err
@@ -38,6 +39,19 @@ func (v Vacuum) RemoveBlob(dgst string) error {
 	blobPath, err := pathFor(blobPathSpec{digest: d})
 	if err != nil {
 		return err
+	}
+
+	if gc {
+		fileInfo, err := v.driver.Stat(v.ctx, blobPath)
+		if err != nil {
+			return err
+		}
+
+		duration := time.Now().Sub(fileInfo.ModTime())
+		if duration <= 2*time.Hour {
+			emit("Blob created less than 2 hour, skip. path %s", blobPath)
+			return nil
+		}
 	}
 
 	dcontext.GetLogger(v.ctx).Infof("Deleting blob: %s", blobPath)

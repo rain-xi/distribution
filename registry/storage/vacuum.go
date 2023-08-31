@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"os"
 	"path"
 	"time"
 
@@ -29,6 +30,26 @@ type Vacuum struct {
 	ctx    context.Context
 }
 
+var timeWindow time.Duration
+
+func init() {
+	tw := os.Getenv("GC_TIME_WINDOW")
+	if tw == "" {
+		timeWindow = 2 * time.Hour
+		return
+	}
+
+	var err error
+	timeWindow, err = time.ParseDuration(tw)
+	if err != nil {
+		emit("failed to parse duration, error %v", err)
+		timeWindow = 2 * time.Hour
+	}
+
+	emit("config gc time window as %s", tw)
+
+}
+
 // RemoveBlob removes a blob from the filesystem
 func (v Vacuum) RemoveBlob(dgst string, gc bool) error {
 	d, err := digest.Parse(dgst)
@@ -48,8 +69,8 @@ func (v Vacuum) RemoveBlob(dgst string, gc bool) error {
 		}
 
 		duration := time.Now().Sub(fileInfo.ModTime())
-		if duration <= 2*time.Hour {
-			emit("Blob created less than 2 hour, skip. path %s", blobPath)
+		if duration <= timeWindow {
+			emit("Blob created less than %s, skip. path %s", timeWindow.String(), blobPath)
 			return nil
 		}
 	}
